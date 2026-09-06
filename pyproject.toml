@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "yatzy"
+version = "0.1.0"
+description = "Командный турнир Яцзы для Windows, macOS, Linux, Android и iOS"
+authors = ["Vladislav Gordin"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "yatzy", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.15"
+flet = { version = "^0.86.5", extras = ["all"] }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.0"
+
+[tool.poetry.scripts]
+yatzy = "yatzy.main:run"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.flet]
+org = "com.yatzy.app"
+product = "Яцзы"
+company = "Yatzy"
+
+[tool.flet.app]
+path = "src"
+
+# Иконки и splash Flet берёт из src/assets по именам:
+# icon.png, icon_android.png, icon_ios.png, icon_web.png,
+# icon_windows.png, icon_macos.png, icon_linux.png, splash.png
+
+[tool.flet.android]
+adaptive_icon_background = "#1A2744"
+
+[tool.flet.splash]
+color = "#1A2744"
+dark_color = "#1A2744"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
