@@ -6,7 +6,6 @@ import flet as ft
 
 from yatzy.models import (
     DEFAULT_GOAL,
-    DEFAULT_TEAM_NAMES,
     DraftPlayer,
     MAX_PLAYERS,
     MAX_TEAMS,
@@ -228,7 +227,6 @@ def tournament_screen(app: YatzyApp) -> ft.Control:
                     section_label("Матчи"),
                     ft.TextButton("Новая игра", icon=ft.Icons.ADD, on_click=lambda _e: app.add_game()),
                     ft.TextButton("Редактировать", icon=ft.Icons.EDIT_OUTLINED, on_click=lambda _e: app.open_setup(edit=True)),
-                    ft.TextButton("Выгрузить JSON", icon=ft.Icons.DOWNLOAD, on_click=lambda _e: app.export_tournament()),
                 ],
                 wrap=True,
             ),
@@ -371,9 +369,13 @@ def _ensure_setup_draft(app: YatzyApp, existing: Tournament | None) -> None:
 
 def _default_setup_teams() -> list[SetupTeam]:
     return [
-        SetupTeam(DEFAULT_TEAM_NAMES[0], TEAM_SWATCHES[0], [], "a"),
-        SetupTeam(DEFAULT_TEAM_NAMES[1], TEAM_SWATCHES[1], [], "b"),
+        SetupTeam("", TEAM_SWATCHES[0], [], "a"),
+        SetupTeam("", TEAM_SWATCHES[1], [], "b"),
     ]
+
+
+def _draft_team_name(draft: SetupTeam, index: int) -> str:
+    return (draft.name or "").strip() or f"Команда {index + 1}"
 
 
 def _player_drafts(players) -> list[DraftPlayer]:
@@ -512,10 +514,10 @@ def _player_editor(app: YatzyApp, team: SetupTeam) -> ft.Control:
 def _tournament_from_setup(name: str, goal: int, drafts: list[SetupTeam]) -> Tournament:
     first, second, *rest = drafts
     extras = []
-    for draft in rest:
+    for index, draft in enumerate(rest, start=2):
         extras.append(
             Team(
-                (draft.name or "Команда").strip() or "Команда",
+                _draft_team_name(draft, index),
                 [TeamPlayer(item.name) for item in draft.players if item.name.strip()],
                 draft.color,
                 draft.key if draft.key not in {"", "a", "b"} else new_id(),
@@ -523,8 +525,8 @@ def _tournament_from_setup(name: str, goal: int, drafts: list[SetupTeam]) -> Tou
         )
     return create_tournament(
         name=name or "Яцзы",
-        team_a=first.name or "Команда A",
-        team_b=second.name or "Команда B",
+        team_a=_draft_team_name(first, 0),
+        team_b=_draft_team_name(second, 1),
         players_a=[item.name for item in first.players],
         players_b=[item.name for item in second.players],
         goal=goal,
@@ -536,18 +538,18 @@ def _tournament_from_setup(name: str, goal: int, drafts: list[SetupTeam]) -> Tou
 
 def _apply_setup_teams(tournament: Tournament, drafts: list[SetupTeam]) -> None:
     first, second, *rest = drafts
-    tournament.team_a.name = (first.name or "Команда A").strip()
+    tournament.team_a.name = _draft_team_name(first, 0)
     tournament.team_a.color = first.color
     tournament.apply_roster("a", first.players)
-    tournament.team_b.name = (second.name or "Команда B").strip()
+    tournament.team_b.name = _draft_team_name(second, 1)
     tournament.team_b.color = second.color
     tournament.apply_roster("b", second.players)
     extras: list[Team] = []
-    for draft in rest:
+    for index, draft in enumerate(rest, start=2):
         team_id = draft.key if draft.key not in {"", "a", "b"} else new_id()
         extras.append(
             Team(
-                (draft.name or "Команда").strip() or "Команда",
+                _draft_team_name(draft, index),
                 [],
                 draft.color,
                 team_id,

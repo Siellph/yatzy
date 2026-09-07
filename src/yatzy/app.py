@@ -8,7 +8,6 @@ from yatzy.io import dumps_tournament, parse_tournaments, read_tournaments, sugg
 from yatzy.models import (
     CATEGORY_BY_KEY,
     DEFAULT_GOAL,
-    DEFAULT_TEAM_NAMES,
     DraftPlayer,
     MAX_PLAYERS,
     MAX_TEAMS,
@@ -33,6 +32,10 @@ from yatzy.ui.screens import (
 )
 
 COMPACT_WIDTH = 840
+WINDOW_MIN_WIDTH = 960
+WINDOW_MIN_HEIGHT = 720
+WINDOW_WIDTH = 1200
+WINDOW_HEIGHT = 800
 
 
 class YatzyApp:
@@ -46,8 +49,8 @@ class YatzyApp:
         self.setup_name = "Яцзы"
         self.setup_goal = str(DEFAULT_GOAL)
         self.setup_teams: list[SetupTeam] = [
-            SetupTeam(DEFAULT_TEAM_NAMES[0], TEAM_SWATCHES[0], [], "a"),
-            SetupTeam(DEFAULT_TEAM_NAMES[1], TEAM_SWATCHES[1], [], "b"),
+            SetupTeam("", TEAM_SWATCHES[0], [], "a"),
+            SetupTeam("", TEAM_SWATCHES[1], [], "b"),
         ]
         self.setup_ready = False
         self.setup_view = None
@@ -64,10 +67,10 @@ class YatzyApp:
         page.adaptive = True
         page.padding = 0
         apply_theme(page, self.state.theme_mode, self.state.theme_id)
-        page.window.min_width = 360
-        page.window.min_height = 640
-        page.window.width = 1180
-        page.window.height = 780
+        page.window.min_width = WINDOW_MIN_WIDTH
+        page.window.min_height = WINDOW_MIN_HEIGHT
+        page.window.width = WINDOW_WIDTH
+        page.window.height = WINDOW_HEIGHT
         page.window.icon = "icon.png"
         page.on_resize = self._on_resize
         page.theme_mode = ft.ThemeMode.DARK if self.state.theme_mode == "dark" else ft.ThemeMode.LIGHT
@@ -116,8 +119,8 @@ class YatzyApp:
             ]
         else:
             self.setup_teams = [
-                SetupTeam(DEFAULT_TEAM_NAMES[0], TEAM_SWATCHES[0], [], "a"),
-                SetupTeam(DEFAULT_TEAM_NAMES[1], TEAM_SWATCHES[1], [], "b"),
+                SetupTeam("", TEAM_SWATCHES[0], [], "a"),
+                SetupTeam("", TEAM_SWATCHES[1], [], "b"),
             ]
         self.setup_ready = True
         self.setup_view = None
@@ -142,7 +145,7 @@ class YatzyApp:
         if len(self.setup_teams) >= MAX_TEAMS:
             return
         index = len(self.setup_teams)
-        self.setup_teams.append(SetupTeam(f"Команда {index + 1}", TEAM_SWATCHES[index % len(TEAM_SWATCHES)], [], new_id()))
+        self.setup_teams.append(SetupTeam("", TEAM_SWATCHES[index % len(TEAM_SWATCHES)], [], new_id()))
         self._patch_setup("add")
 
     def setup_remove_team(self, team: SetupTeam) -> None:
@@ -289,7 +292,8 @@ class YatzyApp:
             self.page.pop_dialog()
             self.state.delete_tournament(tournament_id)
             self.persist()
-            self.screen = "home" if not self.state.active_tournament else "tournament"
+            self.screen = "home"
+            self.nav_index = 0
             self.refresh()
 
         self.page.show_dialog(
@@ -332,7 +336,10 @@ class YatzyApp:
         elif errors:
             self._toast(f"Часть файлов не прочитана: {', '.join(errors)}")
 
-    async def export_tournament(self, tournament_id: str | None = None) -> None:
+    def export_tournament(self, tournament_id: str | None = None) -> None:
+        self.page.run_task(self._export_tournament, tournament_id)
+
+    async def _export_tournament(self, tournament_id: str | None = None) -> None:
         tournament = self.state.tournament_by_id(tournament_id) or self.state.active_tournament
         if tournament is None:
             self._toast("Нет турнира для выгрузки.")

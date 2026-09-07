@@ -107,6 +107,18 @@ def test_setup_edit_builds() -> None:
     assert isinstance(setup_screen(app, tournament), ft.Control)
 
 
+def test_new_setup_starts_with_empty_team_names() -> None:
+    from yatzy.ui.screens import _default_setup_teams, _draft_team_name
+
+    teams = _default_setup_teams()
+    assert len(teams) == 2
+    assert teams[0].name == ""
+    assert teams[1].name == ""
+    assert _draft_team_name(teams[0], 0) == "Команда 1"
+    teams[0].name = "Альфа"
+    assert _draft_team_name(teams[0], 0) == "Альфа"
+
+
 def test_setup_adds_team_without_rebuilding_form() -> None:
     from yatzy.ui.screens import SetupScreen
 
