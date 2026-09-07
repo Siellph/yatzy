@@ -25,6 +25,9 @@ class FakeApp:
     def open_add_tournament_menu(self, _e: object = None) -> None:
         return None
 
+    def open_sync_menu(self, _e: object = None) -> None:
+        return None
+
     def setup_add_player(self, team) -> None:
         return None
 

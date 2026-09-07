@@ -36,6 +36,9 @@ path = "src"
 [tool.flet.android]
 adaptive_icon_background = "#1A2744"
 
+[tool.flet.android.manifest_application]
+usesCleartextTraffic = "true"
+
 [tool.flet.splash]
 color = "#1A2744"
 dark_color = "#1A2744"

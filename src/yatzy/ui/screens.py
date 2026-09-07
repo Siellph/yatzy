@@ -35,6 +35,7 @@ def home_screen(app: YatzyApp) -> ft.Control:
                 heading("Яцзы"),
                 body("Создайте турнир кнопкой + или загрузите его из JSON.", muted=True),
                 ft.Button("Добавить турнир", icon=ft.Icons.ADD, on_click=app.open_add_tournament_menu),
+                ft.OutlinedButton("Синхронизация по Wi‑Fi", icon=ft.Icons.SYNC, on_click=app.open_sync_menu),
             ],
             spacing=14,
             scroll=ft.ScrollMode.AUTO,

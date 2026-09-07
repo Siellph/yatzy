@@ -34,12 +34,14 @@ def dumps_pack(tournaments: list[Tournament]) -> str:
     return json.dumps(pack_payload(tournaments), ensure_ascii=False, indent=2)
 
 
-def parse_tournaments(raw: str | bytes | dict | list) -> list[Tournament]:
+def parse_tournaments(raw: str | bytes | dict | list, allow_empty: bool = False) -> list[Tournament]:
     if isinstance(raw, bytes):
         raw = raw.decode("utf-8")
     data = json.loads(raw) if isinstance(raw, str) else raw
     items = _extract_dicts(data)
     if not items:
+        if allow_empty and isinstance(data, dict) and isinstance(data.get("tournaments"), list):
+            return []
         raise ValueError("В файле нет турнира Яцзы.")
     return [Tournament.from_dict(item) for item in items]
 

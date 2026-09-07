@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
 
 import flet as ft
 
-from yatzy.io import dumps_tournament, parse_tournaments, read_tournaments, suggested_filename, write_tournament
+from yatzy.io import dumps_tournament, merge_tournaments, parse_tournaments, read_tournaments, suggested_filename, write_tournament
 from yatzy.models import (
     CATEGORY_BY_KEY,
     DEFAULT_GOAL,
@@ -18,7 +20,8 @@ from yatzy.models import (
     Tournament,
     new_id,
 )
-from yatzy.ru import imported_tournaments
+from yatzy.lan_sync import LanHost, SyncError, join_session, new_token, start_host
+from yatzy.ru import imported_tournaments, synced_tournaments
 from yatzy.storage import load_state, save_state
 from yatzy.theme import TEAM_SWATCHES, THEME_PALETTES, apply_theme, team_color
 from yatzy.ui.salute import show_goal_salute
@@ -54,6 +57,8 @@ class YatzyApp:
         ]
         self.setup_ready = False
         self.setup_view = None
+        self._lan_host: LanHost | None = None
+        self._lan_lock = threading.Lock()
         self._shell = ft.Container(expand=True, padding=ft.Padding.symmetric(horizontal=16, vertical=10))
         self._scroll_offset = 0.0
         self._scroll_screen: str | None = None
@@ -208,6 +213,52 @@ class YatzyApp:
                 actions=[ft.TextButton("Закрыть", on_click=lambda _event: self.page.pop_dialog())],
             )
         )
+
+    def open_sync_menu(self, _e: ft.Event | None = None) -> None:
+        from yatzy.ui.sync_dialog import open_sync_menu
+
+        open_sync_menu(self)
+
+    def start_lan_host(self) -> LanHost | None:
+        self.stop_lan_host(close_dialog=False)
+        try:
+            self._lan_host = start_host(new_token(), self._merge_from_peer)
+        except OSError:
+            self._toast("Не удалось открыть сеть. Проверьте Wi‑Fi.")
+            return None
+        return self._lan_host
+
+    def stop_lan_host(self, close_dialog: bool = True) -> None:
+        host = self._lan_host
+        self._lan_host = None
+        if host is not None:
+            host.stop()
+        if close_dialog:
+            self.page.pop_dialog()
+            self.refresh()
+
+    def _merge_from_peer(self, incoming: list[Tournament]) -> list[Tournament]:
+        with self._lan_lock:
+            self.state.tournaments = merge_tournaments(self.state.tournaments, incoming)
+            self.persist()
+            return list(self.state.tournaments)
+
+    async def join_lan_sync(self, raw: str) -> None:
+        try:
+            merged = await asyncio.to_thread(join_session, raw, list(self.state.tournaments))
+        except SyncError as error:
+            self._toast(str(error))
+            return
+        self.state.tournaments = merged
+        if self.state.active_tournament is None and merged:
+            self.state.active_tournament_id = merged[0].id
+            self.state.active_game_id = merged[0].games[0].id if merged[0].games else None
+        self.persist()
+        self.page.pop_dialog()
+        self.screen = "home"
+        self.nav_index = 0
+        self.refresh()
+        self._toast(synced_tournaments(len(merged)))
 
     def open_tournament(self, tournament_id: str | None = None) -> None:
         if tournament_id:
@@ -466,6 +517,17 @@ class YatzyApp:
             center_title=compact,
             bgcolor=ft.Colors.SURFACE,
             actions=[
+                *(
+                    [
+                        ft.IconButton(
+                            ft.Icons.SYNC,
+                            tooltip="Синхронизация по Wi‑Fi",
+                            on_click=self.open_sync_menu,
+                        )
+                    ]
+                    if self.screen == "home"
+                    else []
+                ),
                 *(
                     [
                         ft.IconButton(

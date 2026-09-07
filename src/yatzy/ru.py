@@ -28,3 +28,9 @@ def imported_tournaments(count: int) -> str:
     noun = ru_count(count, "турнир", "турнира", "турниров")
     verb = "Загружен" if ru_one(count) else "Загружено"
     return f"{verb} {noun}"
+
+
+def synced_tournaments(count: int) -> str:
+    noun = ru_count(count, "турнир", "турнира", "турниров")
+    verb = "Синхронизирован" if ru_one(count) else "Синхронизировано"
+    return f"{verb} {noun}"
