@@ -15,7 +15,7 @@ from yatzy.models import (
 )
 from yatzy.ru import ru_count, ru_one
 from yatzy.theme import LOSS, WIN, team_color
-from yatzy.ui.widgets import body, heading, progress_bar, team_badge
+from yatzy.ui.widgets import body, progress_bar, team_badge
 
 
 def game_header(game: Game, teams: list[tuple[str, Team]], goal: int) -> ft.Control:
@@ -29,7 +29,6 @@ def game_header(game: Game, teams: list[tuple[str, Team]], goal: int) -> ft.Cont
     ]
     return ft.Column(
         [
-            heading(game.title, 22),
             ft.ResponsiveRow(scores, spacing=12, run_spacing=12),
             body(_match_status(game, teams, goal), muted=True),
         ],

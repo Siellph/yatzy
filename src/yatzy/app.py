@@ -514,7 +514,8 @@ class YatzyApp:
         return ft.AppBar(
             leading=leading,
             title=ft.Text(title),
-            center_title=compact,
+            center_title=False,
+            adaptive=False,
             bgcolor=ft.Colors.SURFACE,
             actions=[
                 *(
