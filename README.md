@@ -78,18 +78,91 @@ poetry run pytest
 
 ## Сборка
 
-Нужны Flutter и SDK целевой платформы. Команды из корня репозитория:
+Нужны Flutter и SDK целевой платформы. Команды из корня репозитория. `--artifact Yatzy` нужен, чтобы на диске не оказалось имени «Яцзы». Иконка и заставка — из `src/assets`.
 
-```bash
-poetry run flet build apk              # Android
-poetry run flet build apk --split-per-abi
-poetry run flet build windows
-poetry run flet build macos
-poetry run flet build linux
-poetry run flet build ipa              # iOS
+Общие флаги:
+
+```text
+--yes --no-rich-output --cleanup-app --exclude .flet --artifact Yatzy --build-version 0.1.0 --build-number 1
 ```
 
-APK появится в `build/apk/`. Иконка и заставка берутся из `src/assets`.
+| Цель | Где собирать | Куда кладёт |
+| --- | --- | --- |
+| `apk` / `aab` | Windows, macOS, Linux | `build/apk/`, `build/aab/` |
+| `windows` | Windows | `build/windows/` |
+| `macos` | macOS | `build/macos/` |
+| `linux` | Linux или WSL | `build/linux/` |
+| `ipa` / `ios-simulator` | macOS | `build/ipa/`, `build/ios-simulator/` |
+| `web` | любая ОС | `build/web/` |
+
+### Android
+
+```bash
+poetry run flet build apk --split-per-abi --yes --no-rich-output --cleanup-app --exclude .flet --artifact Yatzy --build-version 0.1.0 --build-number 1
+```
+
+Для Google Play — `aab` вместо `apk`, без `--split-per-abi`.
+
+### Windows
+
+Нужны Visual Studio с workload **Desktop development with C++** и включённый режим разработчика (симлинки).
+
+```bash
+poetry run flet build windows --yes --no-rich-output --cleanup-app --exclude .flet --artifact Yatzy --build-version 0.1.0 --build-number 1
+```
+
+Результат — папка, не один exe: `Yatzy.exe`, DLL и `data/`. Для установщика берите содержимое `build/flutter/build/windows/x64/runner/Release/` целиком (Inno: главный файл `Yatzy.exe`, остальные `Release\*`, с подпапками).
+
+### macOS
+
+Только на Mac: Xcode 15+, CocoaPods 1.16+, на Apple Silicon — Rosetta 2. По умолчанию универсальный бандл `arm64` + `x86_64`.
+
+```bash
+poetry run flet build macos --yes --no-rich-output --cleanup-app --exclude .flet --artifact Yatzy --build-version 0.1.0 --build-number 1
+```
+
+Только своя архитектура: добавьте `--arch arm64`. Результат — `build/macos/Yatzy.app`. Подпись и нотаризация — отдельно (`--macos-distribution developer-id`).
+
+### Linux
+
+Только Linux или WSL. Нужны GTK 3, clang, cmake, ninja и **lld**. На Ubuntu/Debian:
+
+```bash
+sudo apt update
+sudo apt install -y binutils clang cmake ninja-build pkg-config lld llvm libgtk-3-dev libsecret-1-0 libsecret-1-dev
+```
+
+```bash
+poetry run flet build linux --linux-categories Game --yes --no-rich-output --cleanup-app --exclude .flet --artifact Yatzy --build-version 0.1.0 --build-number 1
+```
+
+В `build/linux/` — исполняемый файл плюс `data/`, `lib/` и Python рядом. Папку не разбрасывать. Для раздачи оберните в AppImage, deb или rpm.
+
+### iOS
+
+Только на Mac. Симулятор, без подписи:
+
+```bash
+poetry run flet build ios-simulator --yes --no-rich-output --cleanup-app --exclude .flet --artifact Yatzy --build-version 0.1.0 --build-number 1
+```
+
+IPA на устройство или TestFlight — Apple Developer, App ID `com.yatzy.app` и Team ID:
+
+```bash
+poetry run flet build ipa --ios-team-id ВАШ_TEAM_ID --yes --no-rich-output --cleanup-app --exclude .flet --artifact Yatzy --build-version 0.1.0 --build-number 1
+```
+
+При необходимости: `--ios-provisioning-profile "имя или UUID"` и `--ios-signing-certificate "Apple Distribution"` (или `"Apple Development"`). Без этого Flet соберёт archive без подписи — на телефон не поставить.
+
+### Web
+
+Статический сайт: Python в браузере (Pyodide).
+
+```bash
+poetry run flet build web --yes --no-rich-output --cleanup-app --exclude .flet --artifact Yatzy --build-version 0.1.0 --build-number 1
+```
+
+Офлайн, без CDN (пакет больше): добавьте `--no-cdn`. Если не в корне сайта: `--base-url /подкаталог/`. Проверка: `poetry run flet serve`. Хостинг — любой статический.
 
 ## Лицензия
 
