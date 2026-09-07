@@ -13,6 +13,7 @@ class FakeApp:
         self.setup_goal = "777"
         self.setup_teams: list[SetupTeam] = []
         self.setup_ready = False
+        self.setup_view = None
         self.game_view = None
 
     def compact(self) -> bool:
@@ -24,16 +25,16 @@ class FakeApp:
     def open_add_tournament_menu(self, _e: object = None) -> None:
         return None
 
-    def setup_add_player(self, team_index: int) -> None:
+    def setup_add_player(self, team) -> None:
         return None
 
-    def setup_remove_player(self, team_index: int, index: int) -> None:
+    def setup_remove_player(self, team, index: int) -> None:
         return None
 
     def setup_add_team(self) -> None:
         return None
 
-    def setup_remove_team(self, index: int) -> None:
+    def setup_remove_team(self, team) -> None:
         return None
 
     def setup_set_team_color(self, team: SetupTeam, color: str) -> None:
@@ -104,6 +105,27 @@ def test_setup_edit_builds() -> None:
     tournament = create_tournament()
     app.state.add_tournament(tournament)
     assert isinstance(setup_screen(app, tournament), ft.Control)
+
+
+def test_setup_adds_team_without_rebuilding_form() -> None:
+    from yatzy.ui.screens import SetupScreen
+
+    app = FakeApp()
+    app.setup_ready = True
+    app.setup_teams = [
+        SetupTeam("А", "#2BB8A3", [], "a"),
+        SetupTeam("Б", "#F2A65A", [], "b"),
+    ]
+    first = setup_screen(app)
+    view = app.setup_view
+    assert isinstance(view, SetupScreen)
+    assert len(view.teams_row.controls) == 2
+    app.setup_teams.append(SetupTeam("В", "#6C8CFF", [], "c"))
+    view.add_team_card()
+    assert setup_screen(app) is first
+    assert len(view.teams_row.controls) == 3
+    assert view.teams_row.controls[0].data is app.setup_teams[0]
+    assert view.teams_row.controls[2].data is app.setup_teams[2]
 
 
 def test_standings_highlights_scores_above_goal() -> None:

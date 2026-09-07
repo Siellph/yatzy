@@ -50,10 +50,12 @@ class YatzyApp:
             SetupTeam(DEFAULT_TEAM_NAMES[1], TEAM_SWATCHES[1], [], "b"),
         ]
         self.setup_ready = False
+        self.setup_view = None
         self._shell = ft.Container(expand=True, padding=ft.Padding.symmetric(horizontal=16, vertical=10))
         self._scroll_offset = 0.0
         self._scroll_screen: str | None = None
         self._scroll_view: ft.Column | None = None
+        self._last_compact: bool | None = None
         self.game_view = None
 
     def start(self) -> None:
@@ -70,9 +72,14 @@ class YatzyApp:
         page.on_resize = self._on_resize
         page.theme_mode = ft.ThemeMode.DARK if self.state.theme_mode == "dark" else ft.ThemeMode.LIGHT
         page.add(ft.SafeArea(expand=True, content=self._shell))
+        self._last_compact = self.compact()
         self.refresh()
 
     def _on_resize(self, _e: ft.PageResizeEvent) -> None:
+        compact = self.compact()
+        if compact == self._last_compact:
+            return
+        self._last_compact = compact
         self.refresh()
 
     def persist(self) -> None:
@@ -113,43 +120,57 @@ class YatzyApp:
                 SetupTeam(DEFAULT_TEAM_NAMES[1], TEAM_SWATCHES[1], [], "b"),
             ]
         self.setup_ready = True
+        self.setup_view = None
         self.screen = "setup"
         self.refresh()
 
-    def setup_add_player(self, team_index: int) -> None:
-        if team_index < 0 or team_index >= len(self.setup_teams):
+    def setup_add_player(self, team: SetupTeam) -> None:
+        if team not in self.setup_teams or len(team.players) >= MAX_PLAYERS:
             return
-        draft = self.setup_teams[team_index].players
-        if len(draft) >= MAX_PLAYERS:
-            return
-        draft.append(DraftPlayer(""))
-        self.refresh()
+        team.players.append(DraftPlayer(""))
+        self._patch_setup("players", team)
 
-    def setup_remove_player(self, team_index: int, index: int) -> None:
-        if team_index < 0 or team_index >= len(self.setup_teams):
+    def setup_remove_player(self, team: SetupTeam, index: int) -> None:
+        if team not in self.setup_teams or index < 0 or index >= len(team.players):
             return
-        draft = self.setup_teams[team_index].players
-        if len(draft) <= MIN_PLAYERS:
+        if len(team.players) <= MIN_PLAYERS:
             return
-        draft.pop(index)
-        self.refresh()
+        team.players.pop(index)
+        self._patch_setup("players", team)
 
     def setup_add_team(self) -> None:
         if len(self.setup_teams) >= MAX_TEAMS:
             return
         index = len(self.setup_teams)
         self.setup_teams.append(SetupTeam(f"Команда {index + 1}", TEAM_SWATCHES[index % len(TEAM_SWATCHES)], [], new_id()))
-        self.refresh()
+        self._patch_setup("add")
 
-    def setup_remove_team(self, index: int) -> None:
-        if len(self.setup_teams) <= MIN_TEAMS or index < 0 or index >= len(self.setup_teams):
+    def setup_remove_team(self, team: SetupTeam) -> None:
+        if len(self.setup_teams) <= MIN_TEAMS or team not in self.setup_teams:
             return
-        self.setup_teams.pop(index)
-        self.refresh()
+        self.setup_teams.remove(team)
+        self._patch_setup("drop", team)
 
     def setup_set_team_color(self, team: SetupTeam, color: str) -> None:
         team.color = color
-        self.refresh()
+        self._patch_setup("color", team)
+
+    def _patch_setup(self, action: str, team: SetupTeam | None = None) -> None:
+        view = self.setup_view
+        if view is None or self.screen != "setup":
+            self.refresh()
+            return
+        if action == "add":
+            view.add_team_card()
+        elif action == "drop" and team is not None:
+            view.drop_team_card(team)
+        elif action == "players" and team is not None:
+            view.sync_players(team)
+        elif action == "color" and team is not None:
+            view.sync_color(team)
+        else:
+            view.rebuild_teams()
+        self.page.update()
 
     def open_add_tournament_menu(self, _e: ft.Event | None = None) -> None:
         def choose_manual(_event: ft.Event) -> None:

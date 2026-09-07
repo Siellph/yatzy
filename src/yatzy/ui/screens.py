@@ -50,80 +50,140 @@ def home_screen(app: YatzyApp) -> ft.Control:
     return ft.Column(cards, spacing=12, scroll=ft.ScrollMode.AUTO)
 
 
-def setup_screen(app: YatzyApp, existing: Tournament | None = None) -> ft.Control:
-    _ensure_setup_draft(app, existing)
+class SetupScreen:
+    """Форма турнира: команды дописываются в ряд, без полной перерисовки экрана."""
 
-    def save(_e: ft.Event[ft.Button]) -> None:
+    def __init__(self, app: YatzyApp, existing: Tournament | None) -> None:
+        self.app = app
+        self.existing = existing
+        self._delete_buttons: list[ft.IconButton] = []
+        _ensure_setup_draft(app, existing)
+        self.teams_row = ft.ResponsiveRow(spacing=12, run_spacing=12)
+        self.add_button = ft.OutlinedButton(
+            "Добавить команду",
+            icon=ft.Icons.GROUP_ADD,
+            on_click=lambda _e: app.setup_add_team(),
+        )
+        self.control = ft.Column(
+            [
+                card(
+                    heading("Новый турнир" if existing is None else "Редактирование турнира"),
+                    body(
+                        f"В матче {ru_count(ROUNDS_PER_MATCH, 'раунд', 'раунда', 'раундов')}. Имена игроков нужны для статистики яцзы.",
+                        muted=True,
+                    ),
+                    ft.ResponsiveRow(
+                        [
+                            ft.Container(
+                                ft.TextField(
+                                    label="Название турнира",
+                                    value=app.setup_name,
+                                    on_change=lambda e: setattr(app, "setup_name", e.control.value or ""),
+                                ),
+                                col={"xs": 12, "md": 8},
+                            ),
+                            ft.Container(
+                                ft.TextField(
+                                    label="Цель, очки",
+                                    value=app.setup_goal,
+                                    keyboard_type=ft.KeyboardType.NUMBER,
+                                    on_change=lambda e: setattr(app, "setup_goal", e.control.value or ""),
+                                ),
+                                col={"xs": 12, "md": 4},
+                            ),
+                        ],
+                        spacing=12,
+                        run_spacing=12,
+                    ),
+                ),
+                section_label("Команды"),
+                self.teams_row,
+                self.add_button,
+                ft.Button("Сохранить", icon=ft.Icons.CHECK, on_click=self._save),
+            ],
+            spacing=14,
+            scroll=ft.ScrollMode.AUTO,
+        )
+        self.rebuild_teams()
+
+    def rebuild_teams(self) -> None:
+        self._delete_buttons.clear()
+        self.teams_row.controls = [
+            self._team_wrap(index, team) for index, team in enumerate(self.app.setup_teams)
+        ]
+        self._sync_chrome()
+
+    def add_team_card(self) -> None:
+        index = len(self.app.setup_teams) - 1
+        self.teams_row.controls.append(self._team_wrap(index, self.app.setup_teams[index]))
+        self._sync_chrome()
+
+    def drop_team_card(self, team: SetupTeam) -> None:
+        for index, wrap in enumerate(list(self.teams_row.controls)):
+            if wrap.data is team:
+                self.teams_row.controls.pop(index)
+                self._delete_buttons.pop(index)
+                break
+        self._sync_chrome()
+
+    def sync_players(self, team: SetupTeam) -> None:
+        wrap = self._wrap_for(team)
+        if wrap is None:
+            return
+        wrap.content.players_slot.content = _player_editor(self.app, team)
+
+    def sync_color(self, team: SetupTeam) -> None:
+        wrap = self._wrap_for(team)
+        if wrap is None:
+            return
+        index = self.app.setup_teams.index(team)
+        position = self.teams_row.controls.index(wrap)
+        self.teams_row.controls[position] = self._team_wrap(index, team, replace_at=position)
+
+    def _save(self, _e: ft.Event[ft.Button]) -> None:
         try:
-            goal_value = int((app.setup_goal or str(DEFAULT_GOAL)).strip() or DEFAULT_GOAL)
+            goal_value = int((self.app.setup_goal or str(DEFAULT_GOAL)).strip() or DEFAULT_GOAL)
         except ValueError:
             goal_value = DEFAULT_GOAL
-        drafts = list(app.setup_teams)
+        drafts = list(self.app.setup_teams)
         if len(drafts) < MIN_TEAMS:
             return
-        if existing is None:
-            app.state.add_tournament(_tournament_from_setup(app.setup_name, goal_value, drafts))
+        if self.existing is None:
+            self.app.state.add_tournament(_tournament_from_setup(self.app.setup_name, goal_value, drafts))
         else:
-            existing.name = (app.setup_name or "Яцзы").strip()
-            existing.goal = max(1, goal_value)
-            _apply_setup_teams(existing, drafts)
-        app.persist()
-        app.open_tournament()
+            self.existing.name = (self.app.setup_name or "Яцзы").strip()
+            self.existing.goal = max(1, goal_value)
+            _apply_setup_teams(self.existing, drafts)
+        self.app.persist()
+        self.app.open_tournament()
 
-    team_cards = [_setup_team_card(app, index) for index in range(len(app.setup_teams))]
-    can_add = len(app.setup_teams) < MAX_TEAMS
-    return ft.Column(
-        [
-            card(
-                heading("Новый турнир" if existing is None else "Редактирование турнира"),
-                body(
-                    f"В матче {ru_count(ROUNDS_PER_MATCH, 'раунд', 'раунда', 'раундов')}. Имена игроков нужны для статистики яцзы.",
-                    muted=True,
-                ),
-                ft.ResponsiveRow(
-                    [
-                        ft.Container(
-                            ft.TextField(
-                                label="Название турнира",
-                                value=app.setup_name,
-                                on_change=lambda e: setattr(app, "setup_name", e.control.value or ""),
-                            ),
-                            col={"xs": 12, "md": 8},
-                        ),
-                        ft.Container(
-                            ft.TextField(
-                                label="Цель, очки",
-                                value=app.setup_goal,
-                                keyboard_type=ft.KeyboardType.NUMBER,
-                                on_change=lambda e: setattr(app, "setup_goal", e.control.value or ""),
-                            ),
-                            col={"xs": 12, "md": 4},
-                        ),
-                    ],
-                    spacing=12,
-                    run_spacing=12,
-                ),
-            ),
-            section_label("Команды"),
-            ft.ResponsiveRow(
-                [
-                    ft.Container(card, col={"xs": 12, "sm": 6, "lg": 4})
-                    for card in team_cards
-                ],
-                spacing=12,
-                run_spacing=12,
-            ),
-            ft.OutlinedButton(
-                "Добавить команду",
-                icon=ft.Icons.GROUP_ADD,
-                disabled=not can_add,
-                on_click=lambda _e: app.setup_add_team(),
-            ),
-            ft.Button("Сохранить", icon=ft.Icons.CHECK, on_click=save),
-        ],
-        spacing=14,
-        scroll=ft.ScrollMode.AUTO,
-    )
+    def _team_wrap(self, index: int, team: SetupTeam, replace_at: int | None = None) -> ft.Container:
+        card, delete_btn = _setup_team_card(self.app, index, team)
+        if replace_at is None:
+            self._delete_buttons.append(delete_btn)
+        else:
+            self._delete_buttons[replace_at] = delete_btn
+        return ft.Container(card, col={"xs": 12, "sm": 6, "lg": 4}, data=team)
+
+    def _wrap_for(self, team: SetupTeam) -> ft.Container | None:
+        for wrap in self.teams_row.controls:
+            if wrap.data is team:
+                return wrap
+        return None
+
+    def _sync_chrome(self) -> None:
+        enabled = len(self.app.setup_teams) > MIN_TEAMS
+        for button in self._delete_buttons:
+            button.disabled = not enabled
+        self.add_button.disabled = len(self.app.setup_teams) >= MAX_TEAMS
+
+
+def setup_screen(app: YatzyApp, existing: Tournament | None = None) -> ft.Control:
+    view = getattr(app, "setup_view", None)
+    if view is None or view.existing is not existing:
+        view = SetupScreen(app, existing)
+        app.setup_view = view
+    return view.control
 
 
 def tournament_screen(app: YatzyApp) -> ft.Control:
@@ -325,20 +385,16 @@ def _player_drafts(players) -> list[DraftPlayer]:
     return drafts
 
 
-def _setup_team_card(app: YatzyApp, index: int) -> ft.Control:
-    team = app.setup_teams[index]
+def _setup_team_card(app: YatzyApp, index: int, team: SetupTeam) -> tuple[ft.Container, ft.IconButton]:
     color = team.color or TEAM_SWATCHES[index % len(TEAM_SWATCHES)]
-    can_remove = len(app.setup_teams) > MIN_TEAMS
-    extras = [_color_picker_button(app, team)]
-    if can_remove:
-        extras.append(
-            ft.IconButton(
-                ft.Icons.DELETE_OUTLINE,
-                tooltip="Удалить команду",
-                on_click=lambda _e, idx=index: app.setup_remove_team(idx),
-            )
-        )
-    return ft.Container(
+    delete_btn = ft.IconButton(
+        ft.Icons.DELETE_OUTLINE,
+        tooltip="Удалить команду",
+        disabled=len(app.setup_teams) <= MIN_TEAMS,
+        on_click=lambda _e, item=team: app.setup_remove_team(item),
+    )
+    players_slot = ft.Container(content=_player_editor(app, team))
+    card = ft.Container(
         content=ft.Column(
             [
                 ft.TextField(
@@ -346,9 +402,14 @@ def _setup_team_card(app: YatzyApp, index: int) -> ft.Control:
                     value=team.name,
                     on_change=lambda e, item=team: setattr(item, "name", e.control.value or ""),
                 ),
-                ft.Row(extras, spacing=8, wrap=True, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.Row(
+                    [_color_picker_button(app, team), delete_btn],
+                    spacing=8,
+                    wrap=True,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
                 body("Игроки", muted=True),
-                _player_editor(app, index),
+                players_slot,
             ],
             spacing=10,
             tight=True,
@@ -363,6 +424,8 @@ def _setup_team_card(app: YatzyApp, index: int) -> ft.Control:
             bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT),
         ),
     )
+    card.players_slot = players_slot
+    return card, delete_btn
 
 
 def _color_picker_button(app: YatzyApp, team: SetupTeam) -> ft.Control:
@@ -402,8 +465,7 @@ def _color_picker_button(app: YatzyApp, team: SetupTeam) -> ft.Control:
     )
 
 
-def _player_editor(app: YatzyApp, team_index: int) -> ft.Control:
-    team = app.setup_teams[team_index]
+def _player_editor(app: YatzyApp, team: SetupTeam) -> ft.Control:
     drafts = team.players
     can_remove = len(drafts) > MIN_PLAYERS
     chips = [
@@ -421,7 +483,7 @@ def _player_editor(app: YatzyApp, team_index: int) -> ft.Control:
                         tooltip="Удалить",
                         icon_size=18,
                         disabled=not can_remove,
-                        on_click=lambda _e, idx=index: app.setup_remove_player(team_index, idx),
+                        on_click=lambda _e, item=team, idx=index: app.setup_remove_player(item, idx),
                     ),
                 ],
                 spacing=0,
@@ -441,7 +503,7 @@ def _player_editor(app: YatzyApp, team_index: int) -> ft.Control:
             add_label,
             icon=ft.Icons.PERSON_ADD_ALT,
             disabled=len(drafts) >= MAX_PLAYERS,
-            on_click=lambda _e: app.setup_add_player(team_index),
+            on_click=lambda _e, item=team: app.setup_add_player(item),
         )
     )
     return ft.Row(chips, wrap=True, spacing=8, run_spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER)
