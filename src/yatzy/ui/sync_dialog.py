@@ -7,6 +7,28 @@ import flet as ft
 from yatzy.lan_sync import format_token, mask_code_input
 from yatzy.ui.widgets import body
 
+_DIALOG_WIDTH = 320
+
+
+def _dialog_block(*controls: ft.Control) -> ft.Column:
+    return ft.Column(
+        list(controls),
+        tight=True,
+        spacing=12,
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        width=_DIALOG_WIDTH,
+    )
+
+
+def _note(text: str) -> ft.Text:
+    return ft.Text(
+        text,
+        size=13,
+        color=ft.Colors.ON_SURFACE_VARIANT,
+        text_align=ft.TextAlign.CENTER,
+        width=_DIALOG_WIDTH,
+    )
+
 if TYPE_CHECKING:
     from yatzy.app import YatzyApp
 
@@ -47,25 +69,22 @@ def _open_host(app: YatzyApp) -> None:
     app.page.show_dialog(
         ft.AlertDialog(
             title=ft.Text("Покажите этот код"),
-            content=ft.Column(
-                [
-                    ft.Text(
-                        format_token(host.token),
-                        size=36,
-                        weight=ft.FontWeight.W_800,
-                        text_align=ft.TextAlign.CENTER,
-                    ),
-                    body("На втором устройстве: синхронизация → ввести код.", muted=True),
-                    ft.TextField(
-                        label="Если не находится, введите целиком",
-                        value=host.invite,
-                        read_only=True,
-                    ),
-                ],
-                tight=True,
-                spacing=12,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                width=360,
+            content=_dialog_block(
+                ft.Text(
+                    format_token(host.token),
+                    size=36,
+                    weight=ft.FontWeight.W_800,
+                    text_align=ft.TextAlign.CENTER,
+                    width=_DIALOG_WIDTH,
+                ),
+                _note("На втором устройстве: синхронизация → ввести код."),
+                ft.TextField(
+                    label="Если не находится, введите целиком",
+                    value=host.invite,
+                    read_only=True,
+                    text_align=ft.TextAlign.CENTER,
+                    width=_DIALOG_WIDTH,
+                ),
             ),
             actions=[ft.TextButton("Закрыть", on_click=lambda _e: app.stop_lan_host())],
         )
@@ -84,28 +103,23 @@ def _open_guest(app: YatzyApp) -> None:
     field = ft.TextField(
         label="Код",
         hint_text="AB 23 CD",
-        helper="Как на другом экране, либо адрес целиком",
         autofocus=True,
         text_align=ft.TextAlign.CENTER,
-        text_size=28,
-        text_style=ft.TextStyle(weight=ft.FontWeight.W_800),
+        content_padding=ft.Padding.symmetric(horizontal=20, vertical=14),
         capitalization=ft.TextCapitalization.CHARACTERS,
         autocorrect=False,
         enable_suggestions=False,
+        width=_DIALOG_WIDTH,
         on_change=reformat,
         on_submit=lambda _e: app.page.run_task(app.join_lan_sync, field.value or ""),
     )
     app.page.show_dialog(
         ft.AlertDialog(
             title=ft.Text("Введите код"),
-            content=ft.Column(
-                [
-                    body("Код с другого экрана. Если не находится — скопируйте строку целиком.", muted=True),
-                    field,
-                ],
-                tight=True,
-                spacing=12,
-                width=360,
+            content=_dialog_block(
+                _note("Код с другого экрана. Если не находится — скопируйте строку целиком."),
+                field,
+                _note("Как на другом экране, либо адрес целиком."),
             ),
             actions=[
                 ft.TextButton("Отмена", on_click=lambda _e: app.page.pop_dialog()),
